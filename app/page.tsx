@@ -4,6 +4,16 @@ import { FormEvent, useState } from "react";
 
 type ShortenedUrl = { shortCode: string; shortUrl: string; originalUrl: string };
 
+function LinkIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a4.5 4.5 0 0 0 6.36 0l3-3A4.5 4.5 0 0 0 13 4.14l-1.72 1.72M14 10.5a4.5 4.5 0 0 0-6.36 0l-3 3A4.5 4.5 0 0 0 11 19.86l1.72-1.72" /></svg>;
+}
+
+function CopyIcon({ done }: { done: boolean }) {
+  return done
+    ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+    : <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>;
+}
+
 export default function Home() {
   const [originalUrl, setOriginalUrl] = useState("");
   const [result, setResult] = useState<ShortenedUrl | null>(null);
@@ -27,16 +37,15 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) {
         const code = data?.error?.code;
-        setError(code === "MISSING_URL" ? "단축할 URL을 입력해 주세요." :
-          code === "SELF_URL" ? "이 서비스의 주소는 단축할 수 없습니다." :
-          code === "INVALID_URL" ? "http 또는 https로 시작하는 올바른 URL을 입력해 주세요." :
-          "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        setError(code === "SELF_URL" ? "내 단축 주소는 사용할 수 없어요." :
+          code === "INVALID_URL" ? "URL 형식을 확인해 주세요." :
+          "링크를 만들지 못했어요. 다시 시도해 주세요.");
         return;
       }
       setResult(data);
       setOriginalUrl(data.originalUrl);
     } catch {
-      setError("서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setError("연결을 확인하고 다시 시도해 주세요.");
     } finally {
       setLoading(false);
     }
@@ -44,64 +53,67 @@ export default function Home() {
 
   async function copyLink() {
     if (!result) return;
-    await navigator.clipboard.writeText(result.shortUrl);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(result.shortUrl);
+      setCopied(true);
+    } catch {
+      setError("링크를 선택해 복사해 주세요.");
+    }
   }
 
   return (
     <main className="page-shell">
-      <nav className="topbar" aria-label="주 메뉴">
+      <header className="topbar">
         <a className="brand" href="/" aria-label="Shortly 홈">
-          <span className="brand-mark" aria-hidden="true">s</span>
+          <span className="brand-mark"><LinkIcon /></span>
           <span>shortly</span>
         </a>
-        <span className="topbar-note">링크를 더 간단하게</span>
-      </nav>
+      </header>
 
       <section className="hero" aria-labelledby="title">
-        <div className="eyebrow"><span className="status-dot" /> FREE LINK SHORTENER</div>
-        <h1 id="title">긴 링크를<br /><span>짧고 간단하게.</span></h1>
-        <p className="intro">복잡한 주소를 붙여넣고, 어디서나 공유하기 쉬운 링크로 바꿔보세요.</p>
-
+        <h1 id="title">링크 단축</h1>
         <form className="shorten-form" onSubmit={submit}>
-          <label className="sr-only" htmlFor="original-url">단축할 URL</label>
+          <label className="sr-only" htmlFor="original-url">원본 URL</label>
           <div className="input-wrap">
-            <span className="link-icon" aria-hidden="true">↗</span>
+            <span className="input-icon"><LinkIcon /></span>
             <input
               id="original-url"
               type="url"
               inputMode="url"
-              placeholder="https://example.com/your/long/link"
+              placeholder="https://example.com/long-link"
               value={originalUrl}
-              onChange={(event) => setOriginalUrl(event.target.value)}
+              onChange={(event) => {
+                setOriginalUrl(event.target.value);
+                setError("");
+                setResult(null);
+                setCopied(false);
+              }}
               required
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? "url-error" : undefined}
             />
-            <button type="submit" disabled={loading}>
-              {loading ? "만드는 중…" : "짧은 링크 만들기"}
-              <span aria-hidden="true">→</span>
+            <button type="submit" disabled={loading || !originalUrl.trim()} aria-label={loading ? "단축 중" : "링크 단축"}>
+              {loading ? <span className="button-spinner" aria-hidden="true" /> : <><span>단축</span><span aria-hidden="true">↗</span></>}
             </button>
           </div>
-          <p className="form-hint">URL을 입력하면 6자리 고유 링크가 만들어집니다.</p>
+          {error && <p className="message error" id="url-error" role="alert"><span aria-hidden="true">!</span>{error}</p>}
         </form>
 
-        {error && <p className="message error" role="alert">{error}</p>}
         {result && (
           <section className="result-card" aria-label="단축 링크 결과" aria-live="polite">
-            <div className="result-label">YOUR SHORT LINK</div>
-            <div className="result-row">
-              <a href={result.shortUrl}>{result.shortUrl}</a>
-              <button className="copy-button" type="button" onClick={copyLink}>
-                {copied ? "복사됨 ✓" : "복사 ↗"}
-              </button>
+            <span className="result-check" aria-hidden="true">✓</span>
+            <div className="result-content">
+              <span className="result-label">단축 링크</span>
+              <a className="result-link" href={result.shortUrl}>{result.shortUrl}</a>
+              <span className="result-original" title={result.originalUrl}>{result.originalUrl}</span>
             </div>
-            <p className="result-original" title={result.originalUrl}>{result.originalUrl}</p>
+            <button className={`copy-button${copied ? " is-copied" : ""}`} type="button" onClick={copyLink} title={copied ? "복사 완료" : "링크 복사"} aria-label={copied ? "복사 완료" : "링크 복사"}>
+              <CopyIcon done={copied} />
+            </button>
+            <span className="sr-only" role="status">{copied ? "링크를 복사했어요." : ""}</span>
           </section>
         )}
-
-        <div className="trust-note"><span aria-hidden="true">✳</span> 언제든지 무료로 링크를 단축하세요.</div>
       </section>
-
-      <footer className="footer"><span>SHORTLY</span><span>작은 링크, 큰 가능성.</span></footer>
     </main>
   );
 }
