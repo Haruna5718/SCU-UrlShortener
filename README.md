@@ -1,6 +1,8 @@
 # URL Shortener
 
-ISCU 1–7주차 URL Shortener 과제용 Next.js 서비스입니다.
+서울사이버대학교 클라우드 컴퓨팅 수업의 [1~7주차 실습 저장소](https://github.com/alifewellspent/iscu_cloud_class)를 바탕으로 완성했습니다.
+
+주차별 입력 검증, API, Neon 저장, 307 리다이렉트, 클릭 통계, 관리자 인증을 이어 붙였고, 과제 요구사항인 중복 URL 재사용과 자기 서비스 URL 차단을 추가했습니다.
 
 ## 실행
 
@@ -9,34 +11,23 @@ npm install
 npm run dev
 ```
 
-기본 주소는 `http://localhost:3000`입니다. Vercel 밖에서는 메모리 저장소로 바로 실행되고, 프로세스를 재시작하면 데이터가 초기화됩니다.
+`DATABASE_URL`이 없는 로컬 개발에서는 메모리 저장소를 사용합니다. 서버를 재시작하면 로컬 데이터가 초기화됩니다. Neon을 연결하려면 `.env.local`에 `DATABASE_URL`을 설정하세요.
 
-## Vercel 배포 전 저장소 설정
+## Neon 설정
 
-Vercel 서버리스 함수는 요청 간 메모리를 공유하지 않으므로, 배포 환경에는 영구 저장소가 필요합니다. Upstash Redis에서 데이터베이스를 만든 다음 Vercel 프로젝트의 **Settings → Environment Variables**에 다음 두 값을 추가하고 Production 배포를 다시 실행하세요.
+Neon SQL Editor에서 [`db/schema.sql`](db/schema.sql)을 실행한 뒤, Vercel Production 환경변수에 pooled connection string을 `DATABASE_URL`로 등록하고 새로 배포합니다. 로컬 관리자 인증에는 `.env.local`에 `ADMIN_PASSWORD`를 설정합니다. 계정 이름은 `admin`입니다.
 
-```text
-KV_REST_API_URL
-KV_REST_API_TOKEN
-```
+Vercel Firewall에서 `POST /api/shorten`에 IP 기준 **60초당 10회** Rate Limit을 설정하세요. 이는 7주차 실습의 Vercel 설정이며 애플리케이션 코드만으로 적용되지 않습니다.
 
-각 값은 Upstash 콘솔의 REST URL과 REST token입니다. 같은 이름을 `.env.local`에 넣으면 로컬에서도 Redis를 사용할 수 있습니다. 이 앱은 URL 중복 확인과 shortCode 저장을 Redis Lua 스크립트 한 번으로 처리합니다.
-
-관리자 화면과 통계 API를 사용하려면 Vercel 환경변수에 `ADMIN_USERNAME`, `ADMIN_PASSWORD`도 설정하세요. 둘 다 설정되면 `/admin`과 `/api/stats`가 HTTP Basic 인증으로 보호됩니다.
-
-## 자동 채점
-
-과제에서 공개한 `iscu_url_shortener_check.py`로 배포 주소를 검사할 수 있습니다.
+## 자동 점검
 
 ```bash
 python -m pip install requests
 python -X utf8 iscu_url_shortener_check.py --url https://본인프로젝트.vercel.app
 ```
 
-로컬 검사:
+로컬 개발 서버:
 
 ```bash
 python -X utf8 iscu_url_shortener_check.py --url http://localhost:3000 --allow-local
 ```
-
-로컬 메모리 저장소 테스트가 통과해도 Vercel Production 주소에서 다시 검사해야 합니다.

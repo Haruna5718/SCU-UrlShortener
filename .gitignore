@@ -1,10 +1,9 @@
-node_modules/
-.next/
-.env*
-!.env.example
-out/
-*.tsbuildinfo
-vercel-debug.log
+node_modules
+.next
+.env
+.env.local
+.vercel
+.DS_Store
 /work/
-/AGENTS.md
 /outputs/
+/AGENTS.md
