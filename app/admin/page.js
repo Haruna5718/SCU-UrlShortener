@@ -6,6 +6,10 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleString("ko-KR") : "-";
 }
 
+function encodeBasicAuth(password) {
+  return btoa(Array.from(new TextEncoder().encode(`admin:${password}`), (byte) => String.fromCharCode(byte)).join(""));
+}
+
 function StatCard({ title, value, detail }) {
   return (
     <article className="stat-card">
@@ -20,14 +24,31 @@ export default function AdminPage() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authToken, setAuthToken] = useState("");
+  const [loginError, setLoginError] = useState("");
 
-  const loadStats = useCallback(async () => {
+  const loadStats = useCallback(async (token = "") => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/stats", { cache: "no-store" });
+      const response = await fetch("/api/stats", {
+        cache: "no-store",
+        headers: token ? { Authorization: `Basic ${token}` } : {},
+      });
+      if (response.status === 401) {
+        setNeedsPassword(true);
+        setLoginError(token ? "비밀번호를 확인해 주세요." : "");
+        setStats(null);
+        return;
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message ?? "통계를 불러오지 못했어요.");
+      setNeedsPassword(false);
+      setLoginError("");
+      setAuthToken(token);
+      setPassword("");
       setStats(data);
     } catch {
       setError("통계를 불러오지 못했어요.");
@@ -38,8 +59,38 @@ export default function AdminPage() {
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
+  function handleLogin(event) {
+    event.preventDefault();
+    loadStats(encodeBasicAuth(password));
+  }
+
   if (loading && !stats) {
     return <main className="admin-page"><div className="loading-spinner" aria-label="불러오는 중" /></main>;
+  }
+
+  if (needsPassword) {
+    return (
+      <main className="admin-page">
+        <form className="admin-login-form" onSubmit={handleLogin}>
+          <h1 className="admin-title">통계</h1>
+          <div className="input-row">
+            <label className="sr-only" htmlFor="admin-password">관리자 비밀번호</label>
+            <input
+              id="admin-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="관리자 비밀번호"
+              autoComplete="current-password"
+              autoFocus
+              required
+            />
+            <button type="submit" disabled={loading}>{loading ? "확인 중" : "로그인"}</button>
+          </div>
+          {loginError && <p className="message message-error" role="alert">{loginError}</p>}
+        </form>
+      </main>
+    );
   }
 
   if (error && !stats) {
@@ -60,7 +111,7 @@ export default function AdminPage() {
       <header className="admin-header">
         <h1 className="admin-title">통계</h1>
         <div className="admin-actions">
-          <button className="admin-button" type="button" onClick={loadStats} disabled={loading} aria-label="새로고침" title="새로고침">↻</button>
+          <button className="admin-button" type="button" onClick={() => loadStats(authToken)} disabled={loading} aria-label="새로고침" title="새로고침">↻</button>
           <a className="admin-home" href="/" aria-label="홈으로" title="홈">⌂</a>
         </div>
       </header>

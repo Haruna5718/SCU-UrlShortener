@@ -1,6 +1,5 @@
 // proxy.js
-// Next.js 16에서는 middleware.js 대신 proxy.js를 사용합니다.
-// 이 Proxy는 /admin 페이지가 렌더링되기 전에 인증과 인가를 검사합니다.
+// 관리자 페이지는 로그인 폼을 렌더링하고, 통계 API가 인증을 검사합니다.
 
 import { NextResponse } from "next/server";
 import { authenticate } from "./lib/auth";
@@ -19,20 +18,21 @@ function authenticationRequiredResponse() {
 function forbiddenResponse() {
   return new NextResponse("Forbidden", {
     status: 403,
-    headers: {
-      "Cache-Control": "no-store",
-    },
+    headers: { "Cache-Control": "no-store" },
   });
 }
 
 export function proxy(request) {
   const user = authenticate(request);
+  const acceptsHtml = request.headers.get("accept")?.includes("text/html");
+  const isRscNavigation = request.headers.get("rsc") === "1";
 
-  if (!user) {
+  // Let browser navigations reach the password form; the stats API still requires auth.
+  if (!user && !acceptsHtml && !isRscNavigation) {
     return authenticationRequiredResponse();
   }
 
-  if (!authorize(user, "admin:page")) {
+  if (user && !authorize(user, "admin:page")) {
     return forbiddenResponse();
   }
 
